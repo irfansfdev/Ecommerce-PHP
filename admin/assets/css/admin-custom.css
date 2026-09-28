@@ -1,0 +1,52 @@
+.main-content select.form-control,
+.main-content select.form-select,
+.main-content textarea.form-control,
+.main-content input[type="file"].form-control,
+.main-content .form-control-sm,
+.main-content .form-select-sm {
+    border: 1px solid #cbd2d9;
+    border-radius: 6px;
+    background-color: #fff;
+    color: #344767;
+    box-shadow: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.main-content select.form-control,
+.main-content select.form-select {
+    min-height: 44px;
+    padding: 0.625rem 2.25rem 0.625rem 0.75rem;
+}
+
+.main-content textarea.form-control {
+    min-height: 120px;
+    padding: 0.75rem;
+    resize: vertical;
+}
+
+.main-content input[type="file"].form-control {
+    min-height: 44px;
+    padding: 0.45rem 0.65rem;
+}
+
+.main-content .form-control-sm,
+.main-content .form-select-sm {
+    min-height: 38px;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+}
+
+.main-content select.form-control:focus,
+.main-content select.form-select:focus,
+.main-content textarea.form-control:focus,
+.main-content input[type="file"].form-control:focus,
+.main-content .form-control-sm:focus,
+.main-content .form-select-sm:focus {
+    border-color: #344767;
+    box-shadow: 0 0 0 3px rgba(52, 71, 103, 0.12);
+    outline: 0;
+}
+
+.admin-status-control {
+    min-height: 44px;
+}

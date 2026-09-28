@@ -119,15 +119,21 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                 <p class="text-sm">Placed: <?= date('d M Y, h:i A', strtotime($order['created_at'])) ?></p>
 
                 <form method="post" class="mt-3">
-                    <label class="form-label text-sm">Order Status</label>
-                    <select name="order_status" class="form-control mb-3">
+                    <label for="order-status" class="form-label text-sm d-flex justify-content-between align-items-center">
+                        Order Status
+                        <span class="badge <?= $statusBadge[$order['order_status']] ?? 'bg-gradient-secondary' ?>" data-status-badge="order"><?= ucfirst($order['order_status']) ?></span>
+                    </label>
+                    <select id="order-status" name="order_status" class="form-control admin-status-control mb-3" data-status-preview="order">
                         <?php foreach (['processing', 'shipped', 'delivered', 'cancelled'] as $s): ?>
                             <option value="<?= $s ?>" <?= $order['order_status'] === $s ? 'selected' : '' ?>><?= ucfirst($s) ?></option>
                         <?php endforeach; ?>
                     </select>
 
-                    <label class="form-label text-sm">Payment Status</label>
-                    <select name="payment_status" class="form-control mb-3">
+                    <label for="payment-status" class="form-label text-sm d-flex justify-content-between align-items-center">
+                        Payment Status
+                        <span class="badge <?= $order['payment_status'] === 'completed' ? 'bg-gradient-success' : ($order['payment_status'] === 'failed' ? 'bg-gradient-danger' : 'bg-gradient-warning') ?>" data-status-badge="payment"><?= ucfirst($order['payment_status']) ?></span>
+                    </label>
+                    <select id="payment-status" name="payment_status" class="form-control admin-status-control mb-3" data-status-preview="payment">
                         <?php foreach (['pending', 'completed', 'failed'] as $s): ?>
                             <option value="<?= $s ?>" <?= $order['payment_status'] === $s ? 'selected' : '' ?>><?= ucfirst($s) ?></option>
                         <?php endforeach; ?>
