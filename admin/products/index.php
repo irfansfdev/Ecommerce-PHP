@@ -68,20 +68,20 @@ require_once __DIR__ . '/../../includes/admin-header.php';
             <h6 class="mb-0">All Products</h6>
             <a href="create.php" class="btn btn-sm bg-gradient-dark mb-0">+ Add Product</a>
         </div>
-        <form method="get" class="row g-2 mt-3">
-            <div class="col-md-5">
-                <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by name..." value="<?= htmlspecialchars($search) ?>">
+        <form method="get" class="row g-2 mt-3 align-items-start">
+            <div class="col-md-4">
+                <input type="text" name="q" class="form-control form-control-sm admin-filter-control" placeholder="Search by name..." value="<?= htmlspecialchars($search) ?>">
             </div>
             <div class="col-md-4">
-                <select name="category" class="form-select form-select-sm">
+                <select name="category" class="form-select form-select-sm admin-filter-control">
                     <option value="0">All categories</option>
                     <?php foreach ($categories as $c): ?>
                         <option value="<?= (int) $c['id'] ?>" <?= $categoryId === (int) $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-sm btn-outline-dark w-100">Filter</button>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-sm btn-outline-dark admin-filter-control w-100">Filter</button>
             </div>
         </form>
     </div>
@@ -100,7 +100,9 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($products)): ?>
-                        <tr><td colspan="6" class="text-center text-sm text-secondary py-3">No products found.</td></tr>
+                        <tr>
+                            <td colspan="6" class="text-center text-sm text-secondary py-3">No products found.</td>
+                        </tr>
                     <?php endif; ?>
                     <?php foreach ($products as $p): ?>
                         <tr>
