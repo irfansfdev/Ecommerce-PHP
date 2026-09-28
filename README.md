@@ -256,6 +256,13 @@ Update it once with:
 
 (Any existing rows with `paypal` need to be deleted or changed first.)
 
+If checkout reports `Unknown column 'shipping_address' in 'field list'`, add
+the address column to an existing orders table with this one-time migration:
+
+  ALTER TABLE orders ADD COLUMN shipping_address TEXT NULL AFTER transaction_id;
+  UPDATE orders SET shipping_address = '' WHERE shipping_address IS NULL;
+  ALTER TABLE orders MODIFY shipping_address TEXT NOT NULL;
+
 ## Notes on the template conversion
 
 - The Molla template's top navigation is actually its own "demo picker"

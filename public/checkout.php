@@ -95,18 +95,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
     $paymentMethod = $_POST['payment_method'] ?? 'cod';
     $v = new Validator();
     $v->required($old['first_name'], 'first name')
-      ->required($old['last_name'], 'last name')
-      ->required($old['address'], 'address')
-      ->required($old['city'], 'city')
-      ->required($old['state'], 'state')
-      ->required($old['zip'], 'zip code')
-      ->required($old['phone'], 'phone number')
-      ->required($old['email'], 'email address')->email($old['email'], 'email address');
+        ->required($old['last_name'], 'last name')
+        ->required($old['address'], 'address')
+        ->required($old['city'], 'city')
+        ->required($old['state'], 'state')
+        ->required($old['zip'], 'zip code')
+        ->required($old['phone'], 'phone number')
+        ->required($old['email'], 'email address')->email($old['email'], 'email address');
 
     if (!in_array($paymentMethod, ['cod', 'stripe'], true)) {
         $checkoutError = 'Please choose a payment method.';
     } elseif ($v->fails()) {
         $checkoutError = $v->first();
+    } elseif ($paymentMethod === 'stripe' && STRIPE_SECRET_KEY === '') {
+        $checkoutError = 'Stripe is not configured yet. Please choose Cash on Delivery or add your Stripe test secret key to the project .env file.';
     } else {
         $stockOk = true;
         foreach ($cartItems as $item) {
@@ -204,7 +206,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                 $conn->rollback();
                 error_log('Checkout failed: ' . $e->getMessage());
                 $checkoutError = 'Sorry, we could not complete your checkout. Please try again.';
-                if (Env::bool('APP_DEBUG')) {
+                $showCheckoutDetails = Env::bool('APP_DEBUG')
+                    || (($_POST['debug_checkout'] ?? '') === '1');
+                if ($showCheckoutDetails) {
                     $checkoutError .= ' (' . $e->getMessage() . ')';
                 }
             }
@@ -215,176 +219,170 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 $pageTitle = 'Checkout';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-            <div class="page-header text-center" style="background-image: url('assets/images/page-header-bg.jpg')">
-                <div class="container">
-                    <h1 class="page-title">Checkout<span>Shop</span></h1>
-                </div><!-- End .container -->
-            </div><!-- End .page-header -->
+<div class="page-header text-center" style="background-image: url('assets/images/page-header-bg.jpg')">
+    <div class="container">
+        <h1 class="page-title">Checkout<span>Shop</span></h1>
+    </div><!-- End .container -->
+</div><!-- End .page-header -->
 
-            <nav aria-label="breadcrumb" class="breadcrumb-nav">
-                <div class="container">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="index.php">Home</a></li>
-                        <li class="breadcrumb-item"><a href="category.php">Shop</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">Checkout</li>
-                    </ol>
-                </div><!-- End .container -->
-            </nav><!-- End .breadcrumb-nav -->
+<nav aria-label="breadcrumb" class="breadcrumb-nav">
+    <div class="container">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="index.php">Home</a></li>
+            <li class="breadcrumb-item"><a href="category.php">Shop</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Checkout</li>
+        </ol>
+    </div><!-- End .container -->
+</nav><!-- End .breadcrumb-nav -->
 
-            <div class="page-content">
-                <div class="checkout">
-                    <div class="container">
-                        <?php if ($checkoutError): ?>
-                            <div class="alert alert-danger"><?= htmlspecialchars($checkoutError) ?></div>
-                        <?php endif; ?>
+<div class="page-content">
+    <div class="checkout">
+        <div class="container">
+            <?php if ($checkoutError): ?>
+                <div class="alert alert-danger"><?= htmlspecialchars($checkoutError) ?></div>
+            <?php endif; ?>
 
                         <form action="checkout.php" method="post" id="checkout-form">
-                            <div class="row">
-                                <div class="col-lg-9">
-                                    <h2 class="checkout-title">Billing Details</h2>
-                                    <div class="row">
-                                        <div class="col-sm-6">
-                                            <label>First Name *</label>
-                                            <input type="text" class="form-control" name="first_name" value="<?= htmlspecialchars($old['first_name']) ?>" required>
-                                        </div>
+                            <?php if (($_GET['debug'] ?? '') === '1'): ?>
+                                <input type="hidden" name="debug_checkout" value="1">
+                            <?php endif; ?>
+                <div class="row">
+                    <div class="col-lg-9">
+                        <h2 class="checkout-title">Billing Details</h2>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <label>First Name *</label>
+                                <input type="text" class="form-control" name="first_name" value="<?= htmlspecialchars($old['first_name']) ?>" required>
+                            </div>
 
-                                        <div class="col-sm-6">
-                                            <label>Last Name *</label>
-                                            <input type="text" class="form-control" name="last_name" value="<?= htmlspecialchars($old['last_name']) ?>" required>
-                                        </div>
+                            <div class="col-sm-6">
+                                <label>Last Name *</label>
+                                <input type="text" class="form-control" name="last_name" value="<?= htmlspecialchars($old['last_name']) ?>" required>
+                            </div>
+                        </div>
+
+                        <label>Street address *</label>
+                        <input type="text" class="form-control" name="address" placeholder="House number and street name" value="<?= htmlspecialchars($old['address']) ?>" required>
+
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <label>Town / City *</label>
+                                <input type="text" class="form-control" name="city" value="<?= htmlspecialchars($old['city']) ?>" required>
+                            </div>
+
+                            <div class="col-sm-6">
+                                <label>State / County *</label>
+                                <input type="text" class="form-control" name="state" value="<?= htmlspecialchars($old['state']) ?>" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <label>Postcode / ZIP *</label>
+                                <input type="text" class="form-control" name="zip" value="<?= htmlspecialchars($old['zip']) ?>" required>
+                            </div>
+
+                            <div class="col-sm-6">
+                                <label>Phone *</label>
+                                <input type="tel" class="form-control" name="phone" value="<?= htmlspecialchars($old['phone']) ?>" required>
+                            </div>
+                        </div>
+
+                        <label>Email address *</label>
+                        <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($old['email']) ?>" required>
+
+                        <label>Order notes (optional)</label>
+                        <textarea class="form-control" name="notes" cols="30" rows="4" placeholder="Notes about your order, e.g. special notes for delivery"><?= htmlspecialchars($old['notes']) ?></textarea>
+                    </div>
+
+                    <aside class="col-lg-3">
+                        <div class="summary">
+                            <h3 class="summary-title">Your Order</h3>
+
+                            <table class="table table-summary">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($cartItems as $item): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($item['name']) ?> <strong>&times; <?= (int) $item['qty'] ?></strong></td>
+                                            <td>$<?= number_format($item['line_total'], 2) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    <tr class="summary-subtotal">
+                                        <td>Subtotal:</td>
+                                        <td>$<?= number_format($cartTotal, 2) ?></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Shipping:</td>
+                                        <td>Free shipping</td>
+                                    </tr>
+                                    <tr class="summary-total">
+                                        <td>Total:</td>
+                                        <td>$<?= number_format($cartTotal, 2) ?></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <div class="accordion-summary" id="accordion-payment">
+                                <div class="card">
+                                    <div class="card-header" id="heading-cod">
+                                        <h2 class="card-title">
+                                            <label class="custom-control custom-radio mb-0">
+                                                <input type="radio" class="custom-control-input" name="payment_method" id="pay-cod" value="cod" <?= $paymentMethod === 'stripe' ? '' : 'checked' ?>>
+                                                <span class="custom-control-label">Cash on Delivery</span>
+                                            </label>
+                                        </h2>
                                     </div>
-
-                                    <label>Street address *</label>
-                                    <input type="text" class="form-control" name="address" placeholder="House number and street name" value="<?= htmlspecialchars($old['address']) ?>" required>
-
-                                    <div class="row">
-                                        <div class="col-sm-6">
-                                            <label>Town / City *</label>
-                                            <input type="text" class="form-control" name="city" value="<?= htmlspecialchars($old['city']) ?>" required>
-                                        </div>
-
-                                        <div class="col-sm-6">
-                                            <label>State / County *</label>
-                                            <input type="text" class="form-control" name="state" value="<?= htmlspecialchars($old['state']) ?>" required>
-                                        </div>
-                                    </div>
-
-                                    <div class="row">
-                                        <div class="col-sm-6">
-                                            <label>Postcode / ZIP *</label>
-                                            <input type="text" class="form-control" name="zip" value="<?= htmlspecialchars($old['zip']) ?>" required>
-                                        </div>
-
-                                        <div class="col-sm-6">
-                                            <label>Phone *</label>
-                                            <input type="tel" class="form-control" name="phone" value="<?= htmlspecialchars($old['phone']) ?>" required>
-                                        </div>
-                                    </div>
-
-                                    <label>Email address *</label>
-                                    <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($old['email']) ?>" required>
-
-                                    <label>Order notes (optional)</label>
-                                    <textarea class="form-control" name="notes" cols="30" rows="4" placeholder="Notes about your order, e.g. special notes for delivery"><?= htmlspecialchars($old['notes']) ?></textarea>
+                                    <div class="card-body">Pay with cash when your order is delivered to your address.</div>
                                 </div>
 
-                                <aside class="col-lg-3">
-                                    <div class="summary">
-                                        <h3 class="summary-title">Your Order</h3>
-
-                                        <table class="table table-summary">
-                                            <thead>
-                                                <tr>
-                                                    <th>Product</th>
-                                                    <th>Total</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($cartItems as $item): ?>
-                                                    <tr>
-                                                        <td><?= htmlspecialchars($item['name']) ?> <strong>&times; <?= (int) $item['qty'] ?></strong></td>
-                                                        <td>$<?= number_format($item['line_total'], 2) ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                                <tr class="summary-subtotal">
-                                                    <td>Subtotal:</td>
-                                                    <td>$<?= number_format($cartTotal, 2) ?></td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Shipping:</td>
-                                                    <td>Free shipping</td>
-                                                </tr>
-                                                <tr class="summary-total">
-                                                    <td>Total:</td>
-                                                    <td>$<?= number_format($cartTotal, 2) ?></td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-
-                                        <div class="accordion-summary" id="accordion-payment">
-                                            <div class="card">
-                                                <div class="card-header" id="heading-cod">
-                                                    <h2 class="card-title">
-                                                        <label class="custom-control custom-radio mb-0">
-                                                            <input type="radio" class="custom-control-input" name="payment_method" id="pay-cod" value="cod" <?= $paymentMethod === 'stripe' ? '' : 'checked' ?>>
-                                                            <span class="custom-control-label">Cash on Delivery</span>
-                                                        </label>
-                                                    </h2>
-                                                </div>
-                                                <div class="card-body">Pay with cash when your order is delivered to your address.</div>
-                                            </div>
-
-                                            <div class="card">
-                                                <div class="card-header" id="heading-stripe">
-                                                    <h2 class="card-title">
-                                                        <label class="custom-control custom-radio mb-0">
-                                                            <input type="radio" class="custom-control-input" name="payment_method" id="pay-stripe" value="stripe" <?= $paymentMethod === 'stripe' ? 'checked' : '' ?>>
-                                                            <span class="custom-control-label">Stripe</span>
-                                                        </label>
-                                                    </h2>
-                                                </div>
-                                                <div class="card-body">Pay securely with Stripe Sandbox using a test card.</div>
-                                            </div>
-                                        </div>
-
-                                        <button type="submit" name="place_order" value="1" class="btn btn-outline-primary-2 btn-order btn-block checkout-place-order">
-                                            <span class="btn-text">Place Order</span>
-                                        </button>
+                                <div class="card">
+                                    <div class="card-header" id="heading-stripe">
+                                        <h2 class="card-title">
+                                            <label class="custom-control custom-radio mb-0">
+                                                <input type="radio" class="custom-control-input" name="payment_method" id="pay-stripe" value="stripe" <?= $paymentMethod === 'stripe' ? 'checked' : '' ?>>
+                                                <span class="custom-control-label">Stripe</span>
+                                            </label>
+                                        </h2>
                                     </div>
-                                </aside>
+                                    <div class="card-body">Pay securely with Stripe Sandbox using a test card.</div>
+                                </div>
                             </div>
-                        </form>
-                    </div>
+
+                            <button type="submit" name="place_order" value="1" class="btn btn-outline-primary-2 btn-order btn-block checkout-place-order">Place Order</button>
+                        </div>
+                    </aside>
                 </div>
-            </div>
-        </main>
+            </form>
+        </div>
+    </div>
+</div>
+</main>
 
-        <style>
-            .checkout-place-order {
-                min-height: 48px !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                transition: all 0.2s ease;
-            }
+<style>
+    .checkout-place-order {
+        min-height: 48px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #c96 !important;
+        -webkit-text-fill-color: #c96 !important;
+        transition: all 0.2s ease;
+    }
 
-            .checkout-place-order .btn-text {
-                color: inherit !important;
-            }
-
-            .checkout-place-order:hover,
-            .checkout-place-order:focus,
-            .checkout-place-order:active {
-                background-color: #c96 !important;
-                border-color: #c96 !important;
-                color: #fff !important;
-                box-shadow: none !important;
-            }
-
-            .checkout-place-order:hover .btn-text,
-            .checkout-place-order:focus .btn-text,
-            .checkout-place-order:active .btn-text {
-                color: #fff !important;
-            }
-        </style>
+    .checkout-place-order:hover,
+    .checkout-place-order:focus,
+    .checkout-place-order:active {
+        background-color: #c96 !important;
+        border-color: #c96 !important;
+        color: #fff !important;
+        -webkit-text-fill-color: #fff !important;
+        box-shadow: none !important;
+    }
+</style>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

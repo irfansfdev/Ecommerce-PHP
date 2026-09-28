@@ -60,7 +60,9 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                 </thead>
                 <tbody>
                     <?php if (empty($orders)): ?>
-                        <tr><td colspan="7" class="text-center text-sm text-secondary py-3">No orders in this view.</td></tr>
+                        <tr>
+                            <td colspan="7" class="text-center text-sm text-secondary py-3">No orders in this view.</td>
+                        </tr>
                     <?php endif; ?>
                     <?php foreach ($orders as $o): ?>
                         <tr>
