@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
+require_once __DIR__ . '/../core/EmailService.php';
 require_once __DIR__ . '/../core/Validator.php';
 require_once __DIR__ . '/../config/stripe.php';
 
@@ -143,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 
                 $orderId = $db->insert(
                     "INSERT INTO orders (user_id, order_number, total_amount, payment_method, payment_status, order_status, transaction_id, shipping_address)
-                     VALUES (?, ?, ?, ?, 'pending', 'processing', NULL, ?)",
+                     VALUES (?, ?, ?, ?, 'pending', 'pending', NULL, ?)",
                     [$userId, $orderNumber, number_format($cartTotal, 2, '.', ''), $paymentMethod, $shippingAddress]
                 );
 
@@ -198,6 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                 }
 
                 $conn->commit();
+                EmailService::sendOrderConfirmation($db, $orderId);
                 Session::set('cart', []);
                 Session::flash('success', 'Your order has been placed - thank you!');
                 header('Location: order-confirmation.php?order=' . urlencode($orderNumber));

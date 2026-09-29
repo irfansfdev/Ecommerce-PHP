@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
+require_once __DIR__ . '/../core/EmailService.php';
 require_once __DIR__ . '/../config/stripe.php';
 
 Session::start();
@@ -41,12 +42,15 @@ if ($order['payment_method'] === 'stripe' && $order['payment_status'] === 'pendi
             throw new RuntimeException('Stripe session does not belong to this order.');
         }
         if ($paid) {
-            $db->run(
-                "UPDATE orders SET payment_status = 'completed', transaction_id = ? WHERE id = ?",
+            $updated = $db->run(
+                "UPDATE orders SET payment_status = 'completed', transaction_id = ? WHERE id = ? AND payment_status = 'pending'",
                 [$checkout['payment_intent'] ?? $checkout['id'], $order['id']]
             );
             $order['payment_status'] = 'completed';
             $order['transaction_id'] = $checkout['payment_intent'] ?? $checkout['id'];
+            if ($updated > 0) {
+                EmailService::sendOrderConfirmation($db, $order['id']);
+            }
             Session::set('cart', []);
         } else {
             $db->run("UPDATE orders SET payment_status = 'failed' WHERE id = ?", [$order['id']]);

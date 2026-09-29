@@ -248,6 +248,21 @@ kept out of the code in a `.env` file in the project root:
 `.env` is git-ignored and blocked from the browser by `.htaccess`. Use
 Stripe's test card `4242 4242 4242 4242` with any future expiry and any CVC.
 
+## Email notifications
+
+PHPMailer is installed with Composer. Run `composer install` after cloning
+the project. Set the `MAIL_*` values from `.env.example` in the project-root
+`.env` file. For Gmail, enable 2-Step Verification and create an App Password
+for `MAIL_PASSWORD`; use the same Gmail address for `MAIL_USERNAME` and
+`MAIL_FROM_ADDRESS`. Never commit `.env` or share the App Password.
+
+Order confirmation is sent after a Cash on Delivery order commits, or after
+Stripe confirms payment. Admin order-status emails are sent only when the
+status actually changes; saving the current status again sends no duplicate.
+Mail failures are logged server-side and do not undo an order or status
+update. Test locally by placing a Cash on Delivery order, then changing its
+status in **Admin -> Orders** (for example, Processing -> Shipped -> Delivered).
+
 If you set up the database before Stripe replaced PayPal, the `orders` table
 still has the old payment-method list and Stripe orders will fail to save.
 Update it once with:
@@ -255,6 +270,13 @@ Update it once with:
     ALTER TABLE orders MODIFY payment_method ENUM('cod', 'stripe') NOT NULL;
 
 (Any existing rows with `paypal` need to be deleted or changed first.)
+
+For an existing database, enable the Pending order state once with:
+
+    ALTER TABLE orders MODIFY order_status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending';
+
+Existing orders keep their current statuses; new checkout orders start as
+Pending.
 
 If checkout reports `Unknown column 'shipping_address' in 'field list'`, add
 the address column to an existing orders table with this one-time migration:

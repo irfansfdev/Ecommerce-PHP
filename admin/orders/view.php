@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../../core/Auth.php';
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../../core/EmailService.php';
 require_once __DIR__ . '/../../core/Helpers.php';
+require_once __DIR__ . '/../../core/OrderStatus.php';
 require_once __DIR__ . '/../../core/Session.php';
 Auth::requireAdmin('../login.php');
 
@@ -21,21 +23,48 @@ if (!$order) {
 
 // Update order/payment status.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $newStatus = $_POST['order_status'] ?? '';
+    $newStatus = $_POST['order_status'] ?? $order['order_status'];
     $newPaymentStatus = $_POST['payment_status'] ?? '';
 
-    $validStatuses = ['processing', 'shipped', 'delivered', 'cancelled'];
     $validPayment = ['pending', 'completed', 'failed'];
+    $previousStatus = $order['order_status'];
 
-    if (in_array($newStatus, $validStatuses, true) && in_array($newPaymentStatus, $validPayment, true)) {
-        $db->run(
-            "UPDATE orders SET order_status = ?, payment_status = ? WHERE id = ?",
-            [$newStatus, $newPaymentStatus, $id]
+    if (is_string($newStatus)
+        && in_array($newPaymentStatus, $validPayment, true)
+        && OrderStatus::isAllowed($previousStatus, $newStatus)
+    ) {
+        $newPaymentStatus = OrderStatus::paymentStatusForUpdate(
+            $order['payment_method'],
+            $newStatus,
+            $newPaymentStatus
         );
-        Session::flash('success', 'Order updated.');
-        header('Location: view.php?id=' . $id);
-        exit;
+        $previousPaymentStatus = $order['payment_status'];
+        $updated = $db->run(
+            "UPDATE orders SET order_status = ?, payment_status = ? WHERE id = ? AND order_status = ?",
+            [$newStatus, $newPaymentStatus, $id, $previousStatus]
+        );
+
+        if ($updated > 0 || $newStatus === $previousStatus) {
+            if ($updated > 0 && $newStatus !== $previousStatus) {
+                EmailService::sendOrderStatusUpdate($db, $id, $previousStatus);
+                if ($order['payment_method'] === 'cod'
+                    && $newStatus === 'delivered'
+                    && $previousPaymentStatus === 'pending'
+                    && $newPaymentStatus === 'completed'
+                ) {
+                    EmailService::sendPaymentReceived($db, $id);
+                }
+            }
+            Session::flash('success', 'Order updated.');
+        } else {
+            Session::flash('error', 'Order status changed before this update. Please review the current order status and try again.');
+        }
+    } else {
+        Session::flash('error', 'That order status transition or payment status is not allowed.');
     }
+
+    header('Location: view.php?id=' . $id);
+    exit;
 }
 
 $items = $db->select(
@@ -47,6 +76,14 @@ $items = $db->select(
 $pageTitle = 'Order ' . $order['order_number'];
 $activeNav = 'orders';
 $base = '../';
+$nextOrderStatuses = OrderStatus::nextStatuses($order['order_status']);
+$statusBadge = [
+    'pending' => 'bg-gradient-warning',
+    'processing' => 'bg-gradient-warning',
+    'shipped' => 'bg-gradient-info',
+    'delivered' => 'bg-gradient-success',
+    'cancelled' => 'bg-gradient-secondary',
+];
 require_once __DIR__ . '/../../includes/admin-header.php';
 ?>
 <div class="row">
@@ -123,9 +160,10 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                         Order Status
                         <span class="badge <?= $statusBadge[$order['order_status']] ?? 'bg-gradient-secondary' ?>" data-status-badge="order"><?= ucfirst($order['order_status']) ?></span>
                     </label>
-                    <select id="order-status" name="order_status" class="form-control admin-status-control mb-3" data-status-preview="order">
-                        <?php foreach (['processing', 'shipped', 'delivered', 'cancelled'] as $s): ?>
-                            <option value="<?= $s ?>" <?= $order['order_status'] === $s ? 'selected' : '' ?>><?= ucfirst($s) ?></option>
+                    <select id="order-status" name="order_status" class="form-control admin-status-control mb-3" data-status-preview="order" <?= empty($nextOrderStatuses) ? 'disabled' : '' ?>>
+                        <option value="<?= htmlspecialchars($order['order_status']) ?>" selected><?= ucfirst($order['order_status']) ?></option>
+                        <?php foreach ($nextOrderStatuses as $nextStatus): ?>
+                            <option value="<?= $nextStatus ?>"><?= ucfirst($nextStatus) ?></option>
                         <?php endforeach; ?>
                     </select>
 

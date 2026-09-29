@@ -56,7 +56,7 @@ $pageTitle = isset($pageTitle) ? $pageTitle . ' - ShopWave' : 'ShopWave - Online
     <link rel="stylesheet" href="assets/css/plugins/jquery.countdown.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/skins/skin-demo-4.css">
-    <link rel="stylesheet" href="assets/css/demos/demo-4.css">
+    <link rel="stylesheet" href="assets/css/demos/demo-4.css?v=<?= filemtime(__DIR__ . '/../public/assets/css/demos/demo-4.css') ?>">
 </head>
 
 <body>
