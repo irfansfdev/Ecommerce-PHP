@@ -33,10 +33,18 @@ class EmailService
             $orderDate = self::formatDate($order['created_at']);
             $brand = self::storeName();
             $statusBadge = self::statusBadge($order['order_status']);
+            $stripePaymentNoteHtml = '';
+            $stripePaymentNoteText = '';
+            if ($order['payment_method'] === 'stripe' && $order['payment_status'] === 'completed') {
+                $stripePaymentNoteHtml = '<p>Your card payment was successfully completed.</p>';
+                $stripePaymentNoteText = "Your card payment was successfully completed.\n\n";
+            }
 
             $html = '<p>Hi ' . self::escape($order['customer_name']) . ',</p>'
                 . '<p>Thanks for choosing ' . self::escape($brand) . '. We have received your order and our team is getting it ready.</p>'
+                . $stripePaymentNoteHtml
                 . self::detailsTable([
+                    ['Order ID', '#' . (int) $order['id']],
                     ['Order number', self::escape($order['order_number'])],
                     ['Order date', self::escape($orderDate)],
                     ['Payment method', self::escape($paymentMethod)],
@@ -48,6 +56,8 @@ class EmailService
 
             $text = 'Hi ' . $order['customer_name'] . ",\n\n"
                 . 'Thanks for choosing ' . $brand . '. We have received your order and our team is getting it ready.' . "\n\n"
+                . $stripePaymentNoteText
+                . 'Order ID: #' . (int) $order['id'] . "\n"
                 . 'Order number: ' . $order['order_number'] . "\n"
                 . 'Order date: ' . $orderDate . "\n"
                 . 'Payment method: ' . $paymentMethod . "\n"
@@ -89,11 +99,6 @@ class EmailService
             }
 
             $statusContent = [
-                'processing' => [
-                    'subject' => "We're Preparing Your Order #ORDER#",
-                    'heading' => 'We are preparing your order',
-                    'message' => "We've confirmed your order and our team is now preparing your items.",
-                ],
                 'shipped' => [
                     'subject' => 'Your Order #ORDER# Is On Its Way',
                     'heading' => 'Your order is on its way',
@@ -129,19 +134,23 @@ class EmailService
             $html = '<p>Hi ' . self::escape($order['customer_name']) . ',</p>'
                 . '<p>' . self::escape($copy['message']) . '</p>'
                 . self::detailsTable([
+                    ['Order ID', '#' . (int) $order['id']],
                     ['Order number', self::escape($order['order_number'])],
                     ['Previous status', self::escape(ucfirst($previousStatus))],
                     ['Current status', self::statusBadge($newStatus)],
                     ['Order total', self::escape(self::formatMoney($order['total_amount']))],
+                    ['Payment method', self::escape(self::paymentMethodLabel($order['payment_method']))],
                     ['Payment status', self::escape(self::paymentStatusLabel($order['payment_status']))],
                     ['Updated', self::escape($updatedAt)],
                 ])
                 . self::orderSummaryHtml($summary, $order['total_amount']);
             $text = 'Hi ' . $order['customer_name'] . ",\n\n" . $copy['message'] . "\n\n"
+                . 'Order ID: #' . (int) $order['id'] . "\n"
                 . 'Order number: ' . $order['order_number'] . "\n"
                 . 'Previous status: ' . ucfirst($previousStatus) . "\n"
                 . 'Current status: ' . ucfirst($newStatus) . "\n"
                 . 'Order total: ' . self::formatMoney($order['total_amount']) . "\n"
+                . 'Payment method: ' . self::paymentMethodLabel($order['payment_method']) . "\n"
                 . 'Payment status: ' . self::paymentStatusLabel($order['payment_status']) . "\n"
                 . 'Updated: ' . $updatedAt . "\n\n"
                 . self::orderSummaryText($summary, $order['total_amount']);
@@ -163,58 +172,6 @@ class EmailService
                 self::emailLayout($copy['heading'], $html, 'View Your Orders'),
                 self::plainTextFooter($text),
                 'order status update #' . $order['order_number']
-            );
-        });
-    }
-
-    public static function sendPaymentReceived(Database $db, $orderId)
-    {
-        return self::safely('COD payment receipt #' . (int) $orderId, function () use ($db, $orderId) {
-            $order = $db->selectOne(
-                "SELECT o.*, u.name AS customer_name, u.email AS customer_email
-                 FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = ?",
-                [(int) $orderId]
-            );
-
-            if (!$order
-                || $order['payment_method'] !== 'cod'
-                || $order['order_status'] !== 'delivered'
-                || $order['payment_status'] !== 'completed'
-            ) {
-                return false;
-            }
-
-            $orderNumber = self::subjectValue($order['order_number']);
-            $amount = self::formatMoney($order['total_amount']);
-            $receivedAt = date('F j, Y g:i A');
-            $html = '<p>Hi ' . self::escape($order['customer_name']) . ',</p>'
-                . '<p>Your order <strong>#' . self::escape($order['order_number']) . '</strong> has been delivered successfully, and we have received your Cash on Delivery payment of <strong>' . self::escape($amount) . '</strong>.</p>'
-                . '<p>Your payment is now marked as completed. Thank you for shopping with us.</p>'
-                . self::detailsTable([
-                    ['Order number', self::escape($order['order_number'])],
-                    ['Payment method', 'Cash on Delivery'],
-                    ['Amount received', self::escape($amount)],
-                    ['Payment status', self::escape(self::paymentStatusLabel($order['payment_status']))],
-                    ['Order status', self::statusBadge($order['order_status'])],
-                    ['Received', self::escape($receivedAt)],
-                ]);
-            $text = 'Hi ' . $order['customer_name'] . ",\n\n"
-                . 'Your order #' . $order['order_number'] . ' has been delivered successfully, and we have received your Cash on Delivery payment of ' . $amount . ".\n\n"
-                . "Your payment is now marked as completed. Thank you for shopping with us.\n\n"
-                . 'Order number: ' . $order['order_number'] . "\n"
-                . "Payment method: Cash on Delivery\n"
-                . 'Amount received: ' . $amount . "\n"
-                . 'Payment status: ' . self::paymentStatusLabel($order['payment_status']) . "\n"
-                . "Order status: Delivered\n"
-                . 'Received: ' . $receivedAt;
-
-            return self::send(
-                $order['customer_email'],
-                $order['customer_name'],
-                'Payment Received for Order #' . $orderNumber,
-                self::emailLayout('Your COD payment has been received', $html, 'View Your Orders'),
-                self::plainTextFooter($text),
-                'COD payment receipt #' . $order['order_number']
             );
         });
     }
@@ -332,7 +289,6 @@ class EmailService
     private static function statusBadge($status)
     {
         $colors = [
-            'pending' => ['#fff5df', '#805b12'],
             'processing' => ['#fff5df', '#805b12'],
             'shipped' => ['#eaf3ff', '#245a91'],
             'delivered' => ['#eaf6ef', '#28633d'],

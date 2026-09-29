@@ -38,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newStatus,
             $newPaymentStatus
         );
-        $previousPaymentStatus = $order['payment_status'];
         $updated = $db->run(
             "UPDATE orders SET order_status = ?, payment_status = ? WHERE id = ? AND order_status = ?",
             [$newStatus, $newPaymentStatus, $id, $previousStatus]
@@ -47,13 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($updated > 0 || $newStatus === $previousStatus) {
             if ($updated > 0 && $newStatus !== $previousStatus) {
                 EmailService::sendOrderStatusUpdate($db, $id, $previousStatus);
-                if ($order['payment_method'] === 'cod'
-                    && $newStatus === 'delivered'
-                    && $previousPaymentStatus === 'pending'
-                    && $newPaymentStatus === 'completed'
-                ) {
-                    EmailService::sendPaymentReceived($db, $id);
-                }
             }
             Session::flash('success', 'Order updated.');
         } else {
@@ -78,7 +70,6 @@ $activeNav = 'orders';
 $base = '../';
 $nextOrderStatuses = OrderStatus::nextStatuses($order['order_status']);
 $statusBadge = [
-    'pending' => 'bg-gradient-warning',
     'processing' => 'bg-gradient-warning',
     'shipped' => 'bg-gradient-info',
     'delivered' => 'bg-gradient-success',

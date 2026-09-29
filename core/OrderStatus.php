@@ -2,7 +2,6 @@
 class OrderStatus
 {
     private const NEXT_STATUSES = [
-        'pending' => ['processing', 'cancelled'],
         'processing' => ['shipped', 'cancelled'],
         'shipped' => ['delivered', 'cancelled'],
         'delivered' => [],

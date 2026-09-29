@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 
                 $orderId = $db->insert(
                     "INSERT INTO orders (user_id, order_number, total_amount, payment_method, payment_status, order_status, transaction_id, shipping_address)
-                     VALUES (?, ?, ?, ?, 'pending', 'pending', NULL, ?)",
+                     VALUES (?, ?, ?, ?, 'pending', 'processing', NULL, ?)",
                     [$userId, $orderNumber, number_format($cartTotal, 2, '.', ''), $paymentMethod, $shippingAddress]
                 );
 

@@ -9,7 +9,7 @@ $db = new Database();
 $status = trim($_GET['status'] ?? '');
 $where = '';
 $params = [];
-if (in_array($status, ['pending', 'processing', 'shipped', 'delivered', 'cancelled'], true)) {
+if (in_array($status, ['processing', 'shipped', 'delivered', 'cancelled'], true)) {
     $where = 'WHERE o.order_status = ?';
     $params[] = $status;
 }
@@ -22,7 +22,6 @@ $orders = $db->select(
 );
 
 $statusBadge = [
-    'pending'    => 'bg-gradient-warning',
     'processing' => 'bg-gradient-warning',
     'shipped'    => 'bg-gradient-info',
     'delivered'  => 'bg-gradient-success',
@@ -39,7 +38,6 @@ require_once __DIR__ . '/../../includes/admin-header.php';
         <h6 class="mb-0">All Orders</h6>
         <div class="btn-group btn-group-sm" role="group">
             <a href="index.php" class="btn btn-outline-dark <?= $status === '' ? 'active' : '' ?>">All</a>
-            <a href="index.php?status=pending" class="btn btn-outline-dark <?= $status === 'pending' ? 'active' : '' ?>">Pending</a>
             <a href="index.php?status=processing" class="btn btn-outline-dark <?= $status === 'processing' ? 'active' : '' ?>">Processing</a>
             <a href="index.php?status=shipped" class="btn btn-outline-dark <?= $status === 'shipped' ? 'active' : '' ?>">Shipped</a>
             <a href="index.php?status=delivered" class="btn btn-outline-dark <?= $status === 'delivered' ? 'active' : '' ?>">Delivered</a>

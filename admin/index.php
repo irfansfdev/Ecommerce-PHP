@@ -36,7 +36,6 @@ $chartLabels = array_map(fn($r) => $r['month_name'], $monthlySales);
 $chartValues = array_map(fn($r) => round((float) $r['sales'], 2), $monthlySales);
 
 $statusBadge = [
-    'pending'    => 'bg-gradient-warning',
     'processing' => 'bg-gradient-warning',
     'shipped'    => 'bg-gradient-info',
     'delivered'  => 'bg-gradient-success',

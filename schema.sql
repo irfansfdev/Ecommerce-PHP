@@ -58,7 +58,7 @@ CREATE TABLE orders (
     total_amount DECIMAL(10, 2) NOT NULL,
     payment_method ENUM('cod', 'stripe') NOT NULL,
     payment_status ENUM('pending', 'completed', 'failed') DEFAULT 'pending',
-    order_status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
+    order_status ENUM('processing', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'processing',
     transaction_id VARCHAR(100) NULL,
     shipping_address TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

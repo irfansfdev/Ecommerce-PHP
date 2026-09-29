@@ -271,12 +271,15 @@ Update it once with:
 
 (Any existing rows with `paypal` need to be deleted or changed first.)
 
-For an existing database, enable the Pending order state once with:
+For an existing database, migrate any legacy Pending orders and remove that
+state from the order-status enum once with:
 
-    ALTER TABLE orders MODIFY order_status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending';
+```sql
+UPDATE orders SET order_status = 'processing' WHERE order_status IS NULL OR order_status = 'pending';
+ALTER TABLE orders MODIFY order_status ENUM('processing', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'processing';
+```
 
-Existing orders keep their current statuses; new checkout orders start as
-Pending.
+New checkout orders start directly as Processing.
 
 If checkout reports `Unknown column 'shipping_address' in 'field list'`, add
 the address column to an existing orders table with this one-time migration:
