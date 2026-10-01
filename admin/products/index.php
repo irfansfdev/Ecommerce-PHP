@@ -110,7 +110,7 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                         <tr>
                             <td>
                                 <div class="d-flex px-2 py-1 align-items-center">
-                                    <img src="<?= htmlspecialchars($base . '../public/' . shop_image(ProductImages::primaryPath($p))) ?>" width="40" height="40" style="object-fit: cover; border-radius: 6px;" class="me-2" alt="">
+                                    <img src="<?= htmlspecialchars('/' . shop_image(ProductImages::primaryPath($p))) ?>" width="40" height="40" style="object-fit: cover; border-radius: 6px;" class="me-2" alt="">
                                     <span class="text-sm font-weight-bold"><?= htmlspecialchars($p['name']) ?></span>
                                 </div>
                             </td>

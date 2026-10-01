@@ -187,7 +187,7 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                     <div class="product-image-existing-list" data-existing-images>
                         <?php foreach ($existingImages as $imageIndex => $imagePath): ?>
                             <label class="product-image-existing" data-existing-product-image>
-                                <img src="<?= htmlspecialchars($base . '../public/' . shop_image($imagePath)) ?>" alt="Product image <?= $imageIndex + 1 ?>">
+                                <img src="<?= htmlspecialchars('/' . shop_image($imagePath)) ?>" alt="Product image <?= $imageIndex + 1 ?>">
                                 <span><input type="checkbox" name="remove_images[]" value="<?= (int) $imageIndex ?>" data-remove-product-image <?= in_array((string) $imageIndex, $removeIndexes, true) ? 'checked' : '' ?>> Remove</span>
                             </label>
                         <?php endforeach; ?>

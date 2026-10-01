@@ -160,7 +160,7 @@ require_once __DIR__ . '/../includes/admin-header.php';
                                 <th class="text-uppercase text-xxs font-weight-bolder opacity-7">Total</th>
                                 <th class="text-uppercase text-xxs font-weight-bolder opacity-7">Payment</th>
                                 <th class="text-uppercase text-xxs font-weight-bolder opacity-7">Status</th>
-                                <th class="text-uppercase text-xxs font-weight-bolder opacity-7">Date</th>
+                                <th class="text-uppercase text-xxs font-weight-bolder opacity-7">Date</th>00
                             </tr>
                         </thead>
                         <tbody>
