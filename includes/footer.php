@@ -171,7 +171,7 @@
     <script src="assets/js/jquery.magnific-popup.min.js"></script>
     <script src="assets/js/jquery.countdown.min.js"></script>
     <!-- Main JS File -->
-    <script src="assets/js/main.js"></script>
+    <script src="assets/js/main.js?v=<?= filemtime(__DIR__ . '/../public/assets/js/main.js') ?>"></script>
     <?php if (!empty($pageScript)): ?>
         <script src="assets/js/demos/<?= htmlspecialchars($pageScript) ?>"></script>
     <?php endif; ?>

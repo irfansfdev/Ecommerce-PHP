@@ -17,27 +17,58 @@ class Uploader
     // $file is one entry from $_FILES, $folder is 'products' or 'categories'.
     // Returns ['success' => true, 'path' => 'uploads/products/xxxx.jpg']
     // or ['success' => false, 'message' => '...'].
-    public static function save($file, $folder)
+    public static function validate($file)
     {
         if (!isset($file['error']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
             return ['success' => false, 'message' => null]; // nothing uploaded, not necessarily an error
         }
 
+        if (in_array($file['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            return ['success' => false, 'message' => 'Image size must not exceed 2MB.'];
+        }
+
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            return ['success' => false, 'message' => 'The file could not be uploaded. Please try again.'];
+            return ['success' => false, 'message' => 'Image upload failed. Please try again.'];
         }
 
-        if ($file['size'] > self::MAX_BYTES) {
-            return ['success' => false, 'message' => 'Image is too large. Maximum size is 2MB.'];
+        $fileSize = isset($file['tmp_name']) && is_file($file['tmp_name']) ? filesize($file['tmp_name']) : false;
+        if ($fileSize === false) {
+            return ['success' => false, 'message' => 'Please upload a valid image.'];
         }
 
-        $mime = mime_content_type($file['tmp_name']);
+        if ($fileSize > self::MAX_BYTES) {
+            return ['success' => false, 'message' => 'Image size must not exceed 2MB.'];
+        }
+
+        $mime = @mime_content_type($file['tmp_name']);
 
         if (!isset(self::ALLOWED_TYPES[$mime])) {
-            return ['success' => false, 'message' => 'Only JPG, PNG, WEBP or GIF images are allowed.'];
+            return ['success' => false, 'message' => 'Please upload a valid image.'];
         }
 
-        $extension = self::ALLOWED_TYPES[$mime];
+        $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        $extensionTypes = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+        ];
+        if (!isset($extensionTypes[$extension]) || $extensionTypes[$extension] !== $mime) {
+            return ['success' => false, 'message' => 'Please upload a valid image.'];
+        }
+
+        return ['success' => true, 'extension' => self::ALLOWED_TYPES[$mime]];
+    }
+
+    public static function save($file, $folder)
+    {
+        $validation = self::validate($file);
+        if (!$validation['success']) {
+            return $validation;
+        }
+
+        $extension = $validation['extension'];
         $filename = bin2hex(random_bytes(10)) . '.' . $extension;
 
         $targetDir = __DIR__ . '/../public/uploads/' . $folder . '/';
@@ -56,11 +87,15 @@ class Uploader
     // public/uploads/ - never the seed images that ship with the template.
     public static function delete($path)
     {
-        if ($path && strpos($path, 'uploads/') === 0) {
-            $full = __DIR__ . '/../public/' . $path;
-            if (is_file($full)) {
-                @unlink($full);
-            }
+        $path = str_replace('\\', '/', (string) $path);
+        if (!preg_match('~^uploads/[A-Za-z0-9_-]+(?:/[A-Za-z0-9._-]+)*$~D', $path)) {
+            return;
+        }
+
+        $uploadsRoot = realpath(__DIR__ . '/../public/uploads');
+        $fullPath = realpath(__DIR__ . '/../public/' . $path);
+        if ($uploadsRoot && $fullPath && strpos($fullPath, $uploadsRoot . DIRECTORY_SEPARATOR) === 0 && is_file($fullPath)) {
+            @unlink($fullPath);
         }
     }
 }

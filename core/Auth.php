@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/Session.php';
+require_once __DIR__ . '/Cart.php';
 
 class Auth
 {
@@ -32,7 +33,17 @@ class Auth
         return ['success' => true];
     }
 
-    public function login($email, $password)
+    public function loginCustomer($email, $password)
+    {
+        return $this->loginForRole($email, $password, 'customer');
+    }
+
+    public function loginAdmin($email, $password)
+    {
+        return $this->loginForRole($email, $password, 'admin');
+    }
+
+    private function loginForRole($email, $password, $requiredRole)
     {
         $user = $this->db->selectOne(
             "SELECT * FROM users WHERE email = ?",
@@ -47,31 +58,68 @@ class Auth
             return ['success' => false, 'message' => 'This account has been deactivated.'];
         }
 
-        Session::start();
+        if ($user['role'] !== $requiredRole) {
+            $message = $requiredRole === 'admin'
+                ? 'This login is for administrators only.'
+                : 'Please use the administrator sign-in page for this account.';
+            return ['success' => false, 'message' => $message];
+        }
+
+        if ($requiredRole === 'admin') {
+            Session::startAdmin();
+        } else {
+            Session::startCustomer();
+        }
         session_regenerate_id(true);
 
         Session::set('user_id', $user['id']);
         Session::set('user_name', $user['name']);
         Session::set('user_role', $user['role']);
+        if ($requiredRole === 'customer') {
+            $cart = new Cart($this->db, $user['id']);
+            $cart->mergeGuestCart();
+        }
 
         return ['success' => true, 'role' => $user['role']];
     }
 
     public static function isLoggedIn()
     {
-        Session::start();
-        return Session::has('user_id');
+        Session::startCustomer();
+        return Session::has('user_id') && Session::get('user_role') === 'customer';
+    }
+
+    public static function getCurrentCustomer()
+    {
+        if (!self::isLoggedIn()) {
+            return null;
+        }
+        return [
+            'id' => (int) Session::get('user_id'),
+            'name' => Session::get('user_name'),
+        ];
     }
 
     public static function isAdmin()
     {
-        Session::start();
-        return Session::get('user_role') === 'admin';
+        Session::startAdmin();
+        return Session::has('user_id') && Session::get('user_role') === 'admin';
     }
 
-    public static function requireLogin($redirectTo = 'login.php')
+    public static function getCurrentAdmin()
     {
-        Session::start();
+        if (!self::isAdmin()) {
+            return null;
+        }
+        return [
+            'id' => (int) Session::get('user_id'),
+            'name' => Session::get('user_name'),
+        ];
+    }
+
+    public static function requireCustomer($redirectTo = 'login.php')
+    {
+        Session::startCustomer();
         if (!self::isLoggedIn()) {
             header('Location: ' . $redirectTo);
             exit;
@@ -80,16 +128,20 @@ class Auth
 
     public static function requireAdmin($redirectTo = 'login.php')
     {
-        Session::start();
-        if (!self::isLoggedIn() || Session::get('user_role') !== 'admin') {
+        Session::startAdmin();
+        if (!self::isAdmin()) {
             header('Location: ' . $redirectTo);
             exit;
         }
     }
 
-    public static function logout()
+    public static function logoutCustomer()
     {
-        Session::start();
-        Session::destroy();
+        Session::destroyCustomer();
+    }
+
+    public static function logoutAdmin()
+    {
+        Session::destroyAdmin();
     }
 }

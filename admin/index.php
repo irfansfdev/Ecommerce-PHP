@@ -165,7 +165,9 @@ require_once __DIR__ . '/../includes/admin-header.php';
                         </thead>
                         <tbody>
                             <?php if (empty($recentOrders)): ?>
-                                <tr><td colspan="6" class="text-center text-sm text-secondary py-3">No orders yet.</td></tr>
+                                <tr>
+                                    <td colspan="6" class="text-center text-sm text-secondary py-3">No orders yet.</td>
+                                </tr>
                             <?php endif; ?>
                             <?php foreach ($recentOrders as $o): ?>
                                 <tr>
@@ -186,26 +188,34 @@ require_once __DIR__ . '/../includes/admin-header.php';
 </div>
 
 <script>
-new Chart(document.getElementById('salesChart').getContext('2d'), {
-    type: 'line',
-    data: {
-        labels: <?= json_encode($chartLabels) ?>,
-        datasets: [{
-            label: 'Sales ($)',
-            data: <?= json_encode($chartValues) ?>,
-            borderColor: '#344767',
-            backgroundColor: 'rgba(52, 71, 103, 0.1)',
-            tension: 0.3,
-            fill: true,
-            pointRadius: 3
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-    }
-});
+    new Chart(document.getElementById('salesChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: <?= json_encode($chartLabels) ?>,
+            datasets: [{
+                label: 'Sales ($)',
+                data: <?= json_encode($chartValues) ?>,
+                borderColor: '#344767',
+                backgroundColor: 'rgba(52, 71, 103, 0.1)',
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
 </script>
 <?php require_once __DIR__ . '/../includes/admin-footer.php'; ?>

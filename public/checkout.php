@@ -2,41 +2,26 @@
 require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
+require_once __DIR__ . '/../core/Cart.php';
 require_once __DIR__ . '/../core/EmailService.php';
 require_once __DIR__ . '/../core/Validator.php';
 require_once __DIR__ . '/../config/stripe.php';
 
-Session::start();
-Auth::requireLogin('login.php?redirect=checkout.php');
+Session::startCustomer();
+Auth::requireCustomer('login.php?redirect=checkout.php');
 
 $db = new Database();
 $userId = Session::get('user_id');
-$cart = Session::get('cart', []);
-
-$cartItems = [];
+$cartService = new Cart($db, $userId);
+$cartItems = array_values(array_filter($cartService->getItems(), function ($item) {
+    return $item['available'];
+}));
 $cartTotal = 0.0;
-
-if (!empty($cart)) {
-    $ids = array_map('intval', array_keys($cart));
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $conn = $db->getConnection();
-    $stmt = $conn->prepare("SELECT id, name, slug, price, stock FROM products WHERE id IN ($placeholders) AND status = 1");
-    $types = str_repeat('i', count($ids));
-    $stmt->bind_param($types, ...$ids);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    while ($row = $result->fetch_assoc()) {
-        $qty = min((int) $cart[$row['id']], (int) $row['stock']);
-        if ($qty <= 0) {
-            continue;
-        }
-        $lineTotal = (float) $row['price'] * $qty;
-        $cartTotal += $lineTotal;
-        $cartItems[] = array_merge($row, ['qty' => $qty, 'line_total' => $lineTotal]);
-    }
-    $stmt->close();
+foreach ($cartItems as &$item) {
+    $item['line_total'] = (float) $item['price'] * (int) $item['qty'];
+    $cartTotal += $item['line_total'];
 }
+unset($item);
 
 if (empty($cartItems)) {
     Session::flash('error', 'Your cart is empty - add something before checking out.');
@@ -111,23 +96,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
     } elseif ($paymentMethod === 'stripe' && STRIPE_SECRET_KEY === '') {
         $checkoutError = 'Stripe is not configured yet. Please choose Cash on Delivery or add your Stripe test secret key to the project .env file.';
     } else {
-        $stockOk = true;
-        foreach ($cartItems as $item) {
-            $fresh = $db->selectOne('SELECT stock FROM products WHERE id = ?', [$item['id']]);
-            if (!$fresh || (int) $fresh['stock'] < $item['qty']) {
-                $stockOk = false;
-                break;
-            }
-        }
+        $conn = $db->getConnection();
+        $conn->begin_transaction();
+        $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
 
-        if (!$stockOk) {
-            $checkoutError = 'Sorry, one of the items in your cart just sold out. Please review your cart and try again.';
-        } else {
-            $conn = $db->getConnection();
-            $conn->begin_transaction();
-            $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+        try {
+                $cartItems = array_values(array_filter($cartService->getItems(true), function ($item) {
+                    return $item['available'];
+                }));
+                if (empty($cartItems)) {
+                    throw new RuntimeException('The cart no longer contains available products.');
+                }
+                $cartTotal = 0.0;
+                foreach ($cartItems as &$item) {
+                    if ($item['qty'] <= 0 || $item['qty'] > $item['stock']) {
+                        throw new RuntimeException('Cart quantity exceeds current stock.');
+                    }
+                    $item['line_total'] = (float) $item['price'] * $item['qty'];
+                    $cartTotal += $item['line_total'];
+                }
+                unset($item);
 
-            try {
                 $shippingAddress = sprintf(
                     "%s %s\n%s\n%s, %s %s\nPhone: %s",
                     $old['first_name'],
@@ -150,8 +139,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 
                 foreach ($cartItems as $item) {
                     $db->insert(
-                        "INSERT INTO order_items (order_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)",
-                        [$orderId, $item['id'], $item['qty'], $item['price'], $item['line_total']]
+                        "INSERT INTO order_items (order_id, product_id, quantity, unit_price, subtotal, cart_item_id) VALUES (?, ?, ?, ?, ?, ?)",
+                        [$orderId, $item['id'], $item['qty'], $item['price'], $item['line_total'], $item['cart_item_id']]
                     );
 
                     $decremented = $db->run(
@@ -160,6 +149,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                     );
                     if ($decremented === 0) {
                         throw new RuntimeException('Insufficient stock for product ' . $item['id']);
+                    }
+                }
+
+                if ($paymentMethod === 'cod') {
+                    foreach ($cartItems as $item) {
+                        $db->run('DELETE FROM cart_items WHERE id = ? AND user_id = ?', [$item['cart_item_id'], $userId]);
                     }
                 }
 
@@ -200,19 +195,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 
                 $conn->commit();
                 EmailService::sendOrderConfirmation($db, $orderId);
-                Session::set('cart', []);
                 Session::flash('success', 'Your order has been placed - thank you!');
                 header('Location: order-confirmation.php?order=' . urlencode($orderNumber));
                 exit;
-            } catch (Throwable $e) {
-                $conn->rollback();
-                error_log('Checkout failed: ' . $e->getMessage());
-                $checkoutError = 'Sorry, we could not complete your checkout. Please try again.';
-                $showCheckoutDetails = Env::bool('APP_DEBUG')
-                    || (($_POST['debug_checkout'] ?? '') === '1');
-                if ($showCheckoutDetails) {
-                    $checkoutError .= ' (' . $e->getMessage() . ')';
-                }
+        } catch (Throwable $e) {
+            $conn->rollback();
+            error_log('Checkout failed: ' . $e->getMessage());
+            $checkoutError = 'Sorry, we could not complete your checkout. Please try again.';
+            $showCheckoutDetails = Env::bool('APP_DEBUG')
+                || (($_POST['debug_checkout'] ?? '') === '1');
+            if ($showCheckoutDetails) {
+                $checkoutError .= ' (' . $e->getMessage() . ')';
             }
         }
     }

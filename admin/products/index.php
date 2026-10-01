@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../core/Auth.php';
 require_once __DIR__ . '/../../core/Database.php';
 require_once __DIR__ . '/../../core/Helpers.php';
 require_once __DIR__ . '/../../core/Uploader.php';
+require_once __DIR__ . '/../../core/ProductImages.php';
 require_once __DIR__ . '/../../core/Session.php';
 Auth::requireAdmin('../login.php');
 
@@ -22,10 +23,11 @@ if (isset($_GET['delete'])) {
     if ((int) $ordered['c'] > 0) {
         Session::flash('error', 'This product appears in existing orders and cannot be deleted. Hide it instead.');
     } else {
-        $product = $db->selectOne("SELECT image FROM products WHERE id = ?", [$id]);
+        $product = $db->selectOne("SELECT id, image, images FROM products WHERE id = ?", [$id]);
         $db->run("DELETE FROM products WHERE id = ?", [$id]);
         if ($product) {
-            Uploader::delete($product['image']);
+            ProductImages::deleteImagePaths($id, ProductImages::paths($product));
+            ProductImages::deleteProductDirectory($id);
         }
         Session::flash('success', 'Product deleted.');
     }
@@ -108,7 +110,7 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                         <tr>
                             <td>
                                 <div class="d-flex px-2 py-1 align-items-center">
-                                    <img src="<?= htmlspecialchars('/' . shop_image($p['image'])) ?>" width="40" height="40" style="object-fit: cover; border-radius: 6px;" class="me-2" alt="">
+                                    <img src="<?= htmlspecialchars($base . '../public/' . shop_image(ProductImages::primaryPath($p))) ?>" width="40" height="40" style="object-fit: cover; border-radius: 6px;" class="me-2" alt="">
                                     <span class="text-sm font-weight-bold"><?= htmlspecialchars($p['name']) ?></span>
                                 </div>
                             </td>

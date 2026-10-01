@@ -2,10 +2,10 @@
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Session.php';
 
-Session::start();
+Session::startAdmin();
 
 // Already signed in as admin - no need to see the login screen again.
-if (Auth::isLoggedIn() && Auth::isAdmin()) {
+if (Auth::isAdmin()) {
     header('Location: index.php');
     exit;
 }
@@ -17,14 +17,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
 
     $auth = new Auth();
-    $result = $auth->login($email, $password);
+    $result = $auth->loginAdmin($email, $password);
 
     if (!$result['success']) {
         $error = $result['message'];
-    } elseif ($result['role'] !== 'admin') {
-        // Right credentials, wrong door - customers sign in on the storefront.
-        Auth::logout();
-        $error = 'This login is for administrators only.';
     } else {
         header('Location: index.php');
         exit;
@@ -40,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="assets/css/nucleo-icons.css" rel="stylesheet">
     <link href="assets/css/nucleo-svg.css" rel="stylesheet">
     <link href="assets/css/material-dashboard.min.css" rel="stylesheet">
+    <link href="assets/css/admin-custom.css?v=<?= filemtime(__DIR__ . '/assets/css/admin-custom.css') ?>" rel="stylesheet">
 </head>
 <body class="bg-gray-200">
     <main class="main-content mt-0">
@@ -56,9 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
                             </div>
                             <div class="card-body">
-                                <?php if ($error): ?>
-                                    <div class="alert alert-danger text-white"><?= htmlspecialchars($error) ?></div>
-                                <?php endif; ?>
+                                <?php $adminToastMessages = $error !== '' ? [['type' => 'error', 'message' => $error]] : []; ?>
+                                <?php require __DIR__ . '/../includes/admin-toast.php'; ?>
                                 <form method="post" class="text-start">
                                     <div class="input-group input-group-outline my-3">
                                         <label class="form-label">Email</label>
@@ -84,5 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </main>
     <script src="assets/js/core/bootstrap.bundle.min.js"></script>
     <script src="assets/js/material-dashboard.min.js"></script>
+    <script src="assets/js/admin-toast.js?v=<?= filemtime(__DIR__ . '/assets/js/admin-toast.js') ?>"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Validator.php';
-Session::start();
+Session::startCustomer();
 
 $contactError = null;
 $old = ['name' => '', 'email' => '', 'subject' => '', 'message' => ''];

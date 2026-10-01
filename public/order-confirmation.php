@@ -5,8 +5,8 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/EmailService.php';
 require_once __DIR__ . '/../config/stripe.php';
 
-Session::start();
-Auth::requireLogin('login.php');
+Session::startCustomer();
+Auth::requireCustomer('login.php');
 
 $db = new Database();
 $userId = Session::get('user_id');
@@ -30,7 +30,6 @@ $items = $db->select(
 $paymentMethodLabels = ['cod' => 'Cash on Delivery', 'stripe' => 'Stripe'];
 $paymentStatusLabels = ['pending' => 'Pending', 'completed' => 'Completed', 'failed' => 'Failed'];
 $orderStatusLabels = ['processing' => 'Processing', 'shipped' => 'Shipped', 'delivered' => 'Delivered', 'cancelled' => 'Cancelled'];
-
 $sessionId = trim($_GET['session_id'] ?? '');
 if ($order['payment_method'] === 'stripe' && $order['payment_status'] === 'pending' && $sessionId !== '') {
     try {
@@ -42,16 +41,42 @@ if ($order['payment_method'] === 'stripe' && $order['payment_status'] === 'pendi
             throw new RuntimeException('Stripe session does not belong to this order.');
         }
         if ($paid) {
-            $updated = $db->run(
-                "UPDATE orders SET payment_status = 'completed', transaction_id = ? WHERE id = ? AND payment_status = 'pending'",
-                [$checkout['payment_intent'] ?? $checkout['id'], $order['id']]
-            );
+            $conn = $db->getConnection();
+            $conn->begin_transaction();
+            try {
+                $updated = $db->run(
+                    "UPDATE orders SET payment_status = 'completed', transaction_id = ? WHERE id = ? AND payment_status = 'pending'",
+                    [$checkout['payment_intent'] ?? $checkout['id'], $order['id']]
+                );
+                if ($updated > 0) {
+                    foreach ($db->select(
+                        'SELECT cart_item_id, quantity FROM order_items WHERE order_id = ? AND cart_item_id IS NOT NULL',
+                        [$order['id']]
+                    ) as $purchasedItem) {
+                        $quantity = (int) $purchasedItem['quantity'];
+                        $cartItemId = (int) $purchasedItem['cart_item_id'];
+                        $remaining = $db->run(
+                            'UPDATE cart_items SET quantity = quantity - ? WHERE id = ? AND user_id = ? AND quantity > ?',
+                            [$quantity, $cartItemId, $userId, $quantity]
+                        );
+                        if ($remaining === 0) {
+                            $db->run(
+                                'DELETE FROM cart_items WHERE id = ? AND user_id = ? AND quantity <= ?',
+                                [$cartItemId, $userId, $quantity]
+                            );
+                        }
+                    }
+                }
+                $conn->commit();
+            } catch (Throwable $e) {
+                $conn->rollback();
+                throw $e;
+            }
             $order['payment_status'] = 'completed';
             $order['transaction_id'] = $checkout['payment_intent'] ?? $checkout['id'];
             if ($updated > 0) {
                 EmailService::sendOrderConfirmation($db, $order['id']);
             }
-            Session::set('cart', []);
         } else {
             $db->run("UPDATE orders SET payment_status = 'failed' WHERE id = ?", [$order['id']]);
             $order['payment_status'] = 'failed';

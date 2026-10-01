@@ -42,6 +42,7 @@ CREATE TABLE products (
     price DECIMAL(10, 2) NOT NULL,
     stock INT UNSIGNED DEFAULT 0,
     image VARCHAR(255) NOT NULL,
+    images JSON NULL,
     status TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -49,7 +50,22 @@ CREATE TABLE products (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------
--- 4. orders
+-- 4. cart_items
+-- ---------------------------------------------------------
+CREATE TABLE cart_items (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    product_id INT UNSIGNED NOT NULL,
+    quantity INT UNSIGNED NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_cart_user_product (user_id, product_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------
+-- 5. orders
 -- ---------------------------------------------------------
 CREATE TABLE orders (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -66,7 +82,7 @@ CREATE TABLE orders (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------
--- 5. order_items
+-- 6. order_items
 -- ---------------------------------------------------------
 CREATE TABLE order_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -75,8 +91,10 @@ CREATE TABLE order_items (
     quantity INT UNSIGNED NOT NULL,
     unit_price DECIMAL(10, 2) NOT NULL,
     subtotal DECIMAL(10, 2) NOT NULL,
+    cart_item_id INT UNSIGNED NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
+    FOREIGN KEY (cart_item_id) REFERENCES cart_items(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------
@@ -114,3 +132,5 @@ INSERT INTO products (category_id, name, slug, description, price, stock, image,
 (5, 'Google Home Hub with Google Assistant', 'google-home-hub', 'A display for your Google Assistant to help manage your day, control your smart home, and enjoy entertainment.', 149.00, 15, 'products/product-17.jpg', 1),
 (6, 'Apple Watch Series 4 Gold Aluminum Case', 'apple-watch-series-4-gold', 'Apple Watch Series 4 with a bigger, more vivid display and advanced fitness tracking.', 429.99, 13, 'products/product-8.jpg', 1),
 (6, 'Apple Watch Series 3 White Sport Band', 'apple-watch-series-3-white', 'Apple Watch Series 3 with built-in GPS to track your run, swim, and everyday activity.', 214.49, 19, 'products/product-12-2.jpg', 1);
+
+UPDATE products SET images = JSON_ARRAY(image) WHERE images IS NULL;

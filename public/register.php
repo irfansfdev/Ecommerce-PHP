@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Validator.php';
-Session::start();
+Session::startCustomer();
 
 if (Auth::isLoggedIn()) {
     header('Location: account.php');
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
 
         if ($result['success']) {
             // Log the new account straight in - no need to make them sign in twice
-            $auth->login($registerEmail, $password);
+            $auth->loginCustomer($registerEmail, $password);
             Session::flash('success', 'Welcome to ShopWave! Your account has been created.');
             header('Location: account.php');
             exit;

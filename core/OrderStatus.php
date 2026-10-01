@@ -21,12 +21,12 @@ class OrderStatus
 
     public static function paymentStatusForUpdate($paymentMethod, $orderStatus, $requestedPaymentStatus)
     {
-        if ($paymentMethod === 'cod' && $orderStatus === 'delivered') {
-            return 'completed';
+        if ($orderStatus === 'cancelled') {
+            return 'failed';
         }
 
-        if ($paymentMethod === 'cod' && $orderStatus === 'cancelled') {
-            return 'pending';
+        if ($paymentMethod === 'cod' && $orderStatus === 'delivered') {
+            return 'completed';
         }
 
         return $requestedPaymentStatus;

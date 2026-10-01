@@ -1,10 +1,12 @@
 <?php
+require_once __DIR__ . '/../core/ProductImages.php';
+
 // Same product-card markup gets reused on the homepage, category page
 // and the "You may also like" strip on the product page, so it lives
 // here once instead of being copy-pasted everywhere.
 function render_product_card($p)
 {
-    $img = htmlspecialchars(shop_image($p['image']));
+    $img = htmlspecialchars(shop_image(ProductImages::primaryPath($p)));
     $name = htmlspecialchars($p['name']);
     $link = 'product.php?slug=' . urlencode($p['slug']);
     ?>
@@ -21,7 +23,7 @@ function render_product_card($p)
                 <?php if ((int) $p['stock'] === 0): ?>
                     <span class="btn-product btn-cart disabled"><span>out of stock</span></span>
                 <?php else: ?>
-                    <a href="cart.php?add=<?= (int) $p['id'] ?>" class="btn-product btn-cart"><span>add to cart</span></a>
+                    <a href="cart.php?add=<?= (int) $p['id'] ?>" class="btn-product btn-cart" data-cart-ajax="true"><span>add to cart</span></a>
                 <?php endif; ?>
             </div>
         </figure>

@@ -3,8 +3,8 @@ require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Validator.php';
-Session::start();
-Auth::requireLogin('login.php?redirect=account.php');
+Session::startCustomer();
+Auth::requireCustomer('login.php?redirect=account.php');
 
 $db = new Database();
 $userId = Session::get('user_id');

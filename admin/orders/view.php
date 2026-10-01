@@ -38,16 +38,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newStatus,
             $newPaymentStatus
         );
-        $updated = $db->run(
-            "UPDATE orders SET order_status = ?, payment_status = ? WHERE id = ? AND order_status = ?",
-            [$newStatus, $newPaymentStatus, $id, $previousStatus]
-        );
+        $conn = $db->getConnection();
+        $conn->begin_transaction();
+        $updated = 0;
+        $transactionFailed = false;
+        try {
+            $updated = $db->run(
+                "UPDATE orders SET order_status = ?, payment_status = ? WHERE id = ? AND order_status = ?",
+                [$newStatus, $newPaymentStatus, $id, $previousStatus]
+            );
 
-        if ($updated > 0 || $newStatus === $previousStatus) {
+            if ($updated > 0 && $newStatus === 'cancelled' && $previousStatus !== 'cancelled') {
+                foreach ($db->select(
+                    'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
+                    [$id]
+                ) as $item) {
+                    $db->run(
+                        'UPDATE products SET stock = stock + ? WHERE id = ?',
+                        [(int) $item['quantity'], (int) $item['product_id']]
+                    );
+                }
+            }
+
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            error_log('Order status update failed: ' . $e->getMessage());
+            $transactionFailed = true;
+        }
+
+        if (!$transactionFailed && ($updated > 0 || $newStatus === $previousStatus)) {
             if ($updated > 0 && $newStatus !== $previousStatus) {
                 EmailService::sendOrderStatusUpdate($db, $id, $previousStatus);
             }
             Session::flash('success', 'Order updated.');
+        } elseif ($transactionFailed) {
+            Session::flash('error', 'The order could not be updated. Please try again.');
         } else {
             Session::flash('error', 'Order status changed before this update. Please review the current order status and try again.');
         }
@@ -99,7 +125,7 @@ require_once __DIR__ . '/../../includes/admin-header.php';
                                 <tr>
                                     <td>
                                         <div class="d-flex px-2 py-1 align-items-center">
-                                            <img src="<?= htmlspecialchars('/' . shop_image($item['image'])) ?>" width="40" height="40" style="object-fit: cover; border-radius: 6px;" class="me-2" alt="">
+                                            <img src="<?= htmlspecialchars($base . '../public/' . shop_image($item['image'])) ?>" width="40" height="40" style="object-fit: cover; border-radius: 6px;" class="me-2" alt="">
                                             <span class="text-sm font-weight-bold"><?= htmlspecialchars($item['name']) ?></span>
                                         </div>
                                     </td>

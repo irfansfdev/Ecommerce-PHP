@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../core/Database.php';
+require_once __DIR__ . '/../core/ProductImages.php';
 
 $db = new Database();
 
@@ -23,6 +24,7 @@ $related = $db->select(
 
 $pageTitle = $product['name'];
 $pageScript = 'demo-4.js';
+$productImages = array_slice(ProductImages::paths($product), 0, ProductImages::MAX_IMAGES);
 
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/product-card.php';
@@ -44,9 +46,18 @@ $inStock = (int) $product['stock'] > 0;
                     <div class="product-details-top">
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="product-gallery">
+                                <div class="product-gallery<?= count($productImages) > 1 ? ' product-gallery-multi' : '' ?>" data-product-gallery>
+                                    <?php if (count($productImages) > 1): ?>
+                                        <div class="product-gallery-thumbnails" role="group" aria-label="Product images">
+                                            <?php foreach ($productImages as $imageIndex => $imagePath): ?>
+                                                <button type="button" class="product-gallery-thumbnail<?= $imageIndex === 0 ? ' active' : '' ?>" data-product-gallery-thumbnail data-image-src="<?= htmlspecialchars(shop_image($imagePath), ENT_QUOTES) ?>" data-image-alt="<?= htmlspecialchars($product['name'] . ' image ' . ($imageIndex + 1), ENT_QUOTES) ?>" aria-label="Show image <?= $imageIndex + 1 ?>" aria-pressed="<?= $imageIndex === 0 ? 'true' : 'false' ?>">
+                                                    <img src="<?= htmlspecialchars(shop_image($imagePath)) ?>" alt="">
+                                                </button>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
                                     <figure class="product-main-image">
-                                        <img src="<?= htmlspecialchars(shop_image($product['image'])) ?>" alt="<?= htmlspecialchars($product['name']) ?>">
+                                        <img src="<?= htmlspecialchars(shop_image($productImages[0] ?? $product['image'])) ?>" alt="<?= htmlspecialchars($product['name']) ?>" data-product-gallery-main>
                                     </figure>
                                 </div><!-- End .product-gallery -->
                             </div><!-- End .col-md-6 -->

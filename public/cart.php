@@ -1,50 +1,65 @@
 <?php
 require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Database.php';
-Session::start();
+require_once __DIR__ . '/../core/Auth.php';
+require_once __DIR__ . '/../core/Cart.php';
+require_once __DIR__ . '/../core/Helpers.php';
+Session::startCustomer();
 
 $db = new Database();
-$cart = Session::get('cart', []);
+$cartService = new Cart($db, Auth::isLoggedIn() ? Session::get('user_id') : null);
 
 // --- Add a product (from a product card or the product detail page) ---
 if (isset($_GET['add'])) {
-    $id = (int) $_GET['add'];
-    $qty = isset($_GET['qty']) ? max(1, (int) $_GET['qty']) : 1;
+    $id = filter_var($_GET['add'], FILTER_VALIDATE_INT);
+    $qty = isset($_GET['qty']) ? filter_var($_GET['qty'], FILTER_VALIDATE_INT) : 1;
+    $ajaxRequest = ($_GET['ajax'] ?? '') === '1';
 
-    $product = $db->selectOne("SELECT id, stock FROM products WHERE id = ? AND status = 1", [$id]);
+    $added = $id !== false && $qty !== false && $qty > 0 && $cartService->add($id, $qty);
+    $message = $added ? 'Added to cart.' : 'Sorry, that item is unavailable or out of stock.';
 
-    if ($product) {
-        $stock = (int) $product['stock'];
-        $currentQty = (int) ($cart[$id] ?? 0);
-        $newQty = min($currentQty + $qty, max($stock, 0));
-
-        if ($stock === 0) {
-            Session::flash('error', "Sorry, that item is out of stock.");
-        } elseif ($newQty <= 0) {
-            unset($cart[$id]);
-        } else {
-            $cart[$id] = $newQty;
-            Session::flash('success', 'Product added to your cart.');
+    if ($ajaxRequest) {
+        $cartItems = $cartService->getItems();
+        $cartCount = 0;
+        $cartTotal = 0.0;
+        foreach ($cartItems as $item) {
+            $cartCount += $item['qty'];
+            $cartTotal += $item['line_total'];
         }
-        Session::set('cart', $cart);
+
+        ob_start();
+        require __DIR__ . '/../includes/cart-dropdown-content.php';
+        $cartDropdownHtml = ob_get_clean();
+
+        if (!$added) {
+            http_response_code(422);
+        }
+        header('Cache-Control: no-store, private');
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => $added,
+            'message' => $message,
+            'cartCount' => $cartCount,
+            'cartDropdownHtml' => $cartDropdownHtml,
+        ]);
+        exit;
     }
 
+    Session::flash($added ? 'success' : 'error', $added ? 'Product added to your cart.' : $message);
     header('Location: cart.php');
     exit;
 }
 
 // --- Remove a single product ---
 if (isset($_GET['remove'])) {
-    $id = (int) $_GET['remove'];
-    unset($cart[$id]);
-    Session::set('cart', $cart);
+    $cartService->remove((int) $_GET['remove']);
     header('Location: cart.php');
     exit;
 }
 
 // --- Empty the whole cart ---
 if (isset($_GET['clear'])) {
-    Session::set('cart', []);
+    $cartService->clear();
     header('Location: cart.php');
     exit;
 }
@@ -54,30 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_cart'])) {
     $qtys = $_POST['qty'] ?? [];
 
     foreach ($qtys as $id => $qty) {
-        $id = (int) $id;
-        $qty = (int) $qty;
-
-        if (!isset($cart[$id])) {
+        if (filter_var($id, FILTER_VALIDATE_INT) === false || filter_var($qty, FILTER_VALIDATE_INT) === false) {
             continue;
         }
-
-        if ($qty <= 0) {
-            unset($cart[$id]);
-            continue;
-        }
-
-        $product = $db->selectOne("SELECT stock FROM products WHERE id = ?", [$id]);
-        $stock = $product ? (int) $product['stock'] : 0;
-
-        if ($stock <= 0) {
-            // Sold out - don't let it sit in the cart at qty 1.
-            unset($cart[$id]);
-        } else {
-            $cart[$id] = min($qty, $stock);
-        }
+        $cartService->update((int) $id, (int) $qty);
     }
 
-    Session::set('cart', $cart);
     Session::flash('success', 'Cart updated.');
     header('Location: cart.php');
     exit;
@@ -85,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_cart'])) {
 
 $pageTitle = 'Shopping Cart';
 require_once __DIR__ . '/../includes/header.php';
-// $cartItems / $cartTotal / $cartCount are already built by header.php from the session cart
+// $cartItems / $cartTotal / $cartCount are built by header.php from the active cart source.
 ?>
 <nav aria-label="breadcrumb" class="breadcrumb-nav border-0 mb-0">
     <div class="container">
@@ -133,6 +130,7 @@ require_once __DIR__ . '/../includes/header.php';
                                                     </figure>
                                                     <h3 class="product-title">
                                                         <a href="product.php?slug=<?= urlencode($item['slug']) ?>"><?= htmlspecialchars($item['name']) ?></a>
+                                                        <?php if (!$item['available']): ?><small class="text-danger">Unavailable</small><?php endif; ?>
                                                     </h3>
                                                 </div>
                                             </td>
@@ -140,13 +138,17 @@ require_once __DIR__ . '/../includes/header.php';
                                             <td class="price-col">$<?= number_format($item['price'], 2) ?></td>
 
                                             <td class="quantity-col">
-                                                <input type="number" name="qty[<?= (int) $item['id'] ?>]" class="form-control" value="<?= (int) $item['qty'] ?>" min="1" max="<?= (int) $item['stock'] ?>" step="1">
+                                                <?php if ($item['available']): ?>
+                                                    <input type="number" name="qty[<?= (int) $item['cart_key'] ?>]" class="form-control" value="<?= (int) $item['qty'] ?>" min="1" max="<?= (int) $item['stock'] ?>" step="1">
+                                                <?php else: ?>
+                                                    <span><?= (int) $item['qty'] ?></span>
+                                                <?php endif; ?>
                                             </td>
 
                                             <td class="total-col">$<?= number_format($item['line_total'], 2) ?></td>
 
                                             <td class="remove-col">
-                                                <a href="cart.php?remove=<?= (int) $item['id'] ?>" class="btn-remove" title="Remove Product"><i class="icon-close"></i></a>
+                                                <a href="cart.php?remove=<?= (int) $item['cart_key'] ?>" class="btn-remove" title="Remove Product"><i class="icon-close"></i></a>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>

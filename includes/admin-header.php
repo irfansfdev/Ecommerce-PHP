@@ -27,7 +27,7 @@ function nav_active($key, $activeNav)
     <link href="<?= $base ?>assets/css/nucleo-icons.css" rel="stylesheet">
     <link href="<?= $base ?>assets/css/nucleo-svg.css" rel="stylesheet">
     <link id="pagestyle" href="<?= $base ?>assets/css/material-dashboard.min.css" rel="stylesheet">
-    <link href="<?= $base ?>assets/css/admin-custom.css" rel="stylesheet">
+    <link href="<?= $base ?>assets/css/admin-custom.css?v=<?= filemtime(__DIR__ . '/../admin/assets/css/admin-custom.css') ?>" rel="stylesheet">
     <?php if (($pageScript ?? '') === 'chart'): ?>
         <!-- Chart.js must load BEFORE the page's inline chart code, which runs later in the body. -->
         <script src="<?= $base ?>assets/js/plugins/chartjs.min.js"></script>
@@ -131,11 +131,4 @@ function nav_active($key, $activeNav)
             </div>
         </nav>
         <div class="container-fluid py-3">
-            <?php $flash = Session::flash('success'); ?>
-            <?php if ($flash): ?>
-                <div class="alert alert-success text-white" role="alert"><?= htmlspecialchars($flash) ?></div>
-            <?php endif; ?>
-            <?php $flashError = Session::flash('error'); ?>
-            <?php if ($flashError): ?>
-                <div class="alert alert-danger text-white" role="alert"><?= htmlspecialchars($flashError) ?></div>
-            <?php endif; ?>
+            <?php require __DIR__ . '/admin-toast.php'; ?>

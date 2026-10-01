@@ -1,8 +1,11 @@
+        <?php $base = $base ?? ''; ?>
         </div>
     </main>
 
     <script src="<?= $base ?>assets/js/core/bootstrap.bundle.min.js"></script>
     <script src="<?= $base ?>assets/js/material-dashboard.min.js"></script>
+    <script src="<?= $base ?>assets/js/admin-form-validation.js?v=<?= filemtime(__DIR__ . '/../admin/assets/js/admin-form-validation.js') ?>"></script>
+    <script src="<?= $base ?>assets/js/admin-toast.js?v=<?= filemtime(__DIR__ . '/../admin/assets/js/admin-toast.js') ?>"></script>
     <script>
         var statusBadgeClasses = {
             order: {

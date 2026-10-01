@@ -146,6 +146,15 @@ Two small things worth knowing when you test:
 3. Open **phpMyAdmin** (`http://localhost/phpmyadmin`), go to the **Import**
    tab, choose `schema.sql` from the project folder, and click **Go**.
     This creates the `e-commerce` database with all tables and seed data.
+  For an existing installation, select the `e-commerce` database and import
+  `migrations/20260930_create_cart_items.sql` instead; do not re-import the
+  full schema, since that is intended for a fresh database.
+  To add product-image JSON storage to an existing database, also import
+  `migrations/20260930_add_product_images_json.sql`, then run
+  `php migrations/migrate_product_image_files.php` from the project folder.
+  The script copies flat uploaded product images into product-ID folders and
+  retains the original files. Fresh installs already create/populate `images`
+  through `schema.sql` and do not need this migration.
 4. Check `config/database.php` - the defaults (`root` user, empty password)
    match WAMP's defaults, so you shouldn't need to change anything unless
    your MySQL root user has a password set.
@@ -175,6 +184,9 @@ Once it's running at `http://localhost/ecommerce-project/public/`:
   of going over.
 - Click **Register** in the header top bar, create an account, and notice
   you're immediately signed in and dropped on **My Account**.
+- Add an item as a guest, then sign in; the guest cart merges into the
+  account's persistent cart. Sign out and back in, or use another browser,
+  to confirm the same database cart remains available.
 - Try registering again with the same email - you'll get a clear
   "account already exists" message instead of a database error.
 - Sign out, then try visiting `account.php` or `checkout.php` directly -

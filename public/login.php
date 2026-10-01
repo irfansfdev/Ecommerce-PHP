@@ -2,14 +2,10 @@
 require_once __DIR__ . '/../core/Session.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Validator.php';
-Session::start();
-
-$scriptPath = str_replace('\\', '/', $_SERVER['SCRIPT_NAME']);
-$publicPath = preg_replace('~/login\.php$~', '', $scriptPath);
-$adminRedirect = preg_replace('~/public$~', '', $publicPath) . '/admin/index.php';
+Session::startCustomer();
 
 if (Auth::isLoggedIn()) {
-    header('Location: ' . (Auth::isAdmin() ? $adminRedirect : 'account.php'));
+    header('Location: account.php');
     exit;
 }
 
@@ -40,10 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         $signinError = $v->first();
     } else {
         $auth = new Auth();
-        $result = $auth->login($signinEmail, $password);
+        $result = $auth->loginCustomer($signinEmail, $password);
 
         if ($result['success']) {
-            header('Location: ' . ($result['role'] === 'admin' ? $adminRedirect : $redirect));
+            header('Location: ' . $redirect);
             exit;
         }
 

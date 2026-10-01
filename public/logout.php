@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../core/Auth.php';
 
-Auth::logout();
+Auth::logoutCustomer();
 header('Location: index.php');
 exit;
