@@ -1,11 +1,16 @@
 Options -Indexes
 
-# Block direct browser access to config, core and admin assets source
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Keep admin folder outside public
+    RewriteRule ^admin(/.*)?$ - [L]
+
+    # Send everything else to public
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
 
-# Keep secrets out of the browser
 <FilesMatch "^\.env">
     Require all denied
 </FilesMatch>
